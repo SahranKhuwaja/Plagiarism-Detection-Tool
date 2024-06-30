@@ -1,0 +1,519 @@
+ibutes (i.e., those mentioned in condition C) and the input attributes 
+of L that are found among the attributes of R and S respectively.
+• 7rl {R x S) = ttl(k m (R) x 7r/v(S)), where M and N are the lists of all 
+attributes of R and S, respectively, that are input attributes of L.
+E xam ple 16.10: Let R(a,b,c) and S{c,d,e) be two relations. Consider the 
+expression ira+e->.x, b->y{R x S). The input attributes of the projection are a,
+b, and e, and c is the only join attribute. We may apply the law for pushing 
+projections below joins to get the equivalent expression:
+7*"a+e—tx, b—ty{^a,byc(R) ^1 ^ ^ (S ))
+Notice that the projection ira,b,c{R) is trivial; it projects onto all the attributes of R. We may thus eliminate this projection and get a third equivalent 
+expression: Tra+e->Xi b->y(R 1x1 7rCie(S)). That is, the only change from the 
+original is that we remove the attribute d from S before the join. □
+We can perform a projection entirely before a bag union. That is:
+• 7tl (R Ub S) = 7tl(R) Us nl (S).
+On the other hand, projections cannot be pushed below set unions or either the 
+set or bag versions of intersection or difference at all.
+E xam ple 16.11: Let R(a,b) consist of the one tuple {(1,2)} and S(a,b)
+consist of the one tuple {(1,3)}. Then TTa(R f~l S) = na(0) = 0. However, 
+TTa(R) n 7rB(S) = {(l)} n {(1)} = {(1)}. □
+776 CHAPTER 16. THE QUERY COMPILER
+If the projection involves some computations, and the input attributes of 
+a term on the projection list belong entirely to one of the arguments of a join 
+or product below the projection, then we have the option, although not the 
+obligation, to perform the computation directly on that argument. An example 
+should help illustrate the point.
+E xam ple 16.12: Again let R(a,b,c) and S(c,d,e) be relations, and consider 
+the join and projection na+i,^Xt d+e-sy { R M S). We can move the sum a + b
+and its renaming to x directly onto the relation R, and move the sum d + e to
+S similarly. The resulting equivalent expression is
+^x ,y (tTo+6—\x, c (R ) ^ ^d+e—fy, c(5))
+One special case to handle is if x or y were c. Then, we could not rename 
+a sum to c, because a relation cannot have two attributes named c. Thus, 
+we would have to invent a temporary name and do another renaming in the 
+projection above the join. For example, 7r0+j_>Ci a+e->y(R x S) could become 
+TTz—»c, y (jta+b—tz, c ( R ) ^ ^ d + e —yy, c(5)). ^
+It is also possible to push a projection below a selection.
+• (o c{R)) = kl (o'c, where M is the list of all attributes that 
+are either input attributes of L or mentioned in condition C.
+As in Example 16.12, we have the option of performing computations on the 
+list L in the list M instead, provided the condition C does not need the input 
+attributes of L that are involved in a computation.
+16.2.5 Laws About Joins and Products
+We saw in Section 16.2.1 many of the important laws involving joins and products: their commutative and associative laws. However, there are a few additional laws that follow directly from the definition of the join, as was mentioned 
+in Section 2.4.12.
+• R tx c & — ac (R x S).
+• R x S = ttl(<7c (R x S)), where C is the condition that equates each 
+pair of attributes from R and S with the same name, and L is a list that 
+includes one attribute from each equated pair and all the other attributes 
+of R and S.
+In practice, we usually want to apply these rules from right to left. That is, we 
+identify a product followed by a selection as a join of some kind. The reason for 
+doing so is that the algorithms for computing joins are generally much faster 
+than algorithms that compute a product followed by a selection on the (very 
+large) result of the product.
+16.2. ALGEBRAIC LAWS FOR IMPROVING QUERY PLANS 777
+16.2.6 Laws Involving Duplicate Elimination
+The operator S, which eliminates duplicates from a bag, can be pushed through 
+many, but not all operators. In general, moving a 6 down the tree reduces the 
+size of intermediate relations and may therefore be beneficial. Moreover, we 
+can sometimes move the S to a position where it can be eliminated altogether, 
+because it is applied to a relation that is known not to possess duplicates:
+• 5(R) = R if R has no duplicates. Important cases of such a relation R
+include
+a) A stored relation with a declared primary key, and
+b) The result of a 7 operation, since grouping creates a relation with 
+no duplicates.
+c) The result of a set union, intersection, or difference.
+Several laws that “push” S through other operators are:
+• S(R x S ) = S(R) x S(S).
+• S(R txS) = 6(R)\x6(S).
+• 5 ( R x c S) = 5(R)*3C d{S).
+. S{ac (R)) =<tc {6(R)).
+We can also move the S to either or both of the arguments of an intersection:
+• 5{R n B S) = S(R) n B S = R n B 6{S) = S(R) n B <5(5).
+On the other hand, 6 generally cannot be pushed through the operators Ub, 
+- b , or 7r.
+E xam ple 16.13: Let R have two copies of the tuple t and 5 have one copy of 
+t. Then S(R UB 5) has one copy of t, while 5(R) Ub S(S) has two copies of t.
+Also, S(R—b 5) has one copy of t, while S(R) —B S(S) has no copy of t.
+Now, consider relation T(a,b) with one copy each of the tuples (1,2) and 
+(1,3), and no other tuples. Then <5(7r0(T)) has one copy of the tuple (1), while 
+ira(d(T)) has two copies of (1). □
+16.2.7 Laws Involving Grouping and Aggregation
+When we consider the operator 7 , we find that the applicability of many transformations depends on the details of the aggregate operators used. Thus, we 
+cannot state laws in the generality that we used for the other operators. One 
+exception is the law, mentioned in Section 16.2.6, that a 7 absorbs a S. Precisely:
+778 CHAPTER 16. THE QUERY COMPILER
+• % l(-R )) = i l (R)-
+Another general rule is that we may project useless attributes from the argument should we wish, prior to applying the 7 operation. This law can be 
+written:
+• 7l (R) = 7l (k m (R)) if M is a list containing at least all those attributes 
+of R that are mentioned in L.
+The reason that other transformations depend on the aggregation (s) involved in a 7 is that some aggregations — MIN and MAX in particular — are not 
+affected by the presence or absence of duplicates. The other aggregations — 
+SUM, COUNT, and AVG — generally produce different values if duplicates are eliminated prior to application of the aggregation.
+Thus, let us call an operator 7^ duplicate-impervious if the only aggregations 
+in L are MIN and/or MAX. Then:
+• 7l (R) = 7l (<5(i?)) provided 71 is duplicate-impervious.
+E xam ple 16.14: Suppose we have the relations
+MovieStar(name, addr, gender, b irth d a te )
+S ta rsln (m o v ieT itle , movieYear, starName)
+and we want to know for each year the birthdate of the youngest star to appear 
+in a movie that year. We can express this query as
+SELECT movieYear, MAX(birthdate)
+FROM M ovieStar, S ta rs ln 
+WHERE name = starName 
+GROUP BY movieYear;
+^ movieYear, MAX ( birthdate )
+° name - starName
+X
+MovieStar Starsln
+Figure 16.13: Initial logical query plan for the query of Example 16.14
+An initial logical query plan constructed directly from the query is shown 
+in Fig. 16.13. The FROM list is expressed by a product, and the WHERE clause 
+by a selection above it. The grouping and aggregation are expressed by the 7
+operator above those. Some transformations that we could apply to Fig. 16.13 
+if we wished are:
+16.2. ALGEBRAIC LAWS FOR IMPROVING QUERY PLANS 779
+1. Combine the selection and product into an equijoin.
+2. Generate a 6 below the 7 , since the 7 is duplicate-impervious.
+3. Generate a n between the 7 and the introduced S to project onto movieYear and b irth d a te , the only attributes relevant to the 7 .
+The resulting plan is shown in Fig. 16.14.
+^ movieYear, MAX ( birthdate )
+^ movieYear, birthdate
+s
+XI
+name = starName
+MovieStar Starsln
+Figure 16.14: Another query plan for the query of Example 16.14
+We can now push the <5 below the x and introduce 7r’s below that if we wish. 
+This new query plan is shown in Fig. 16.15. If name is a key for MovieStar, the
+6 can be eliminated along the branch leading to that relation. □
+^ movieYear, MAX ( birthdate )
+71 movieYear, birthdate
+M
+name = starName
+8 8
+K It birthdate, name movieYear, starName
+MovieStar Starsln
+Figure 16.15: A third query plan for Example 16.14
+780 CHAPTER 16. THE QUERY COMPILER
+16.2.8 Exercises for Section 16.2
+Exercise 16.2.1: When it is possible to push a selection to both arguments 
+of a binary operator, we need to decide whether or not to do so. How would 
+the existence of indexes on one of the arguments affect our choice? Consider, 
+for instance, an expression ac(R fl 5), where there is an index on S.
+E xercise 16.2.2: Give examples to show that:
+a) Projection cannot be pushed below set union.
+b) Projection cannot be pushed below set or bag difference.
+c) Duplicate elimination ((5) cannot be pushed below projection.
+d) Duplicate elimination cannot be pushed below bag union or difference.
+! Exercise 16.2.3: Prove that we can always push a projection below both 
+branches of a bag union.
+! E xercise 16.2.4: Some laws that hold for sets hold for bags; others do not. 
+For each of the laws below that are true for sets, tell whether or not it is true 
+for bags. Either give a proof the law for bags is true, or give a counterexample.
+a) R U R = R (the idempotent law for union).
+b) R fl R = R (the idempotent law for intersection).
+c) R — R = 0.
+d) R U (S fl T) = (R U S) fl (R U T) (distribution of union over intersection).
+! Exercise 16.2.5: We can define C for bags by: R C S if and only if for every 
+element x, the number of times x appears in R is less than or equal to the 
+number of times it appears in S. Tell whether the following statements (which 
+are all true for sets) are true for bags; give either a proof or a counterexample:
+a) If R C S, then R U 5 = S.
+b) If R C S, then R n 5 = R.
+c) If R C S and S C R , then R = S.
+E xercise 16.2.6: Starting with an expression 7vi[R(a,b,c) tx S(b,c,d,e)),
+push the projection down as far as it can go if L is:
+a) b + c - > x , c + d - ^ y .
+b) a, b, a + d -» z.
+16.3. FROM PARSE TREES TO LOGICAL QUERY PLANS 781
+! E xercise 16.2.7: We mentioned in Example 16.14 that none of the plans we 
+showed is necessarily the best plan. Can you think of a better plan?
+! E xercise 16.2.8: The following are possible equalities involving operations on 
+a relation R(a,b). Tell whether or not they are true; give either a proof or a 
+counterexample.
+a) lMIN(a)->y, x(la, SUM(b)-+x(R)) = ly,SUM(b)^yx{lMIN(a)^y, b(R)) ■
+b) rYMIN(a)—>y, x{la, MAX(b)^x{R)) = Jy,MAX(b)~tx {lMIN(a)^y, b(R)) ■
+!! Exercise 16.2.9: The join-like operators of Exercise 15.2.4 obey some of the 
+familiar laws, and others do not. Tell whether each of the following is or is not 
+true. Give either a proof that the law holds or a counterexample.
+a) <tc(R X S ) = crc(R) ■><S.
+b) ac (R & S) = ac {R)& S.
+c) crciR&L S) = crc{R) S, where C involves only attributes of R.
+d) ac(R & l S) = R &c(S), where C involves only attributes of S.
+e) itl{R X S) = ni(R) X 5.
+f) (R & S) cSi T = R dSi (S m T).
+g) R & S = S tS R.
+h) R & L S = S & L Ri) R X S = S X R .
+!! E xercise 16.2.10: While it is not precisely an algebraic law, because it involves an indeterminate number of operands, it is generally true that
+SUM(ai,a2, ... ,a„) = ai + a2 -\------ 1- a„
+SQL has both a SUM operator and addition for integers and reals. Considering 
+the possibility that one or more of the a*’s could be NULL, rather than an integer 
+or real, does this “law” hold in SQL?
+16.3 From Parse Trees to Logical Query Plans
+We now resume our discussion of the query compiler. Having constructed a 
+parse tree for a query in Section 16.1, we next need to turn the parse tree 
+into 
+To keys To keys To keys To keys
+AT <14 14 < K< 52 52 < AT< 78 K > 78
+Figure 14.12: A typical interior node of a B-tree
+between the second and third keys of the block, and the fourth pointer lets us 
+reach some of the records with keys equal to or above the third key of the block.
+As with our example leaf, it is not necessarily the case that all slots for keys 
+and pointers are occupied. However, with n = 3, at least the first key and the 
+first two pointers must be present in an interior node. □
+E xam ple 14.12: Figure 14.13 shows an entire three-level B-tree, with n = 3, 
+as in Example 14.11. We have assumed that the data file consists of records 
+whose keys are all the primes from 2 to 47. Notice that at the leaves, each of 
+these keys appears once, in order. All leaf blocks have two or three key-pointer 
+pairs, plus a pointer to the next leaf in sequence. The keys are in sorted order 
+as we look across the leaves from left to right.
+The root has only two pointers, the minimum possible number, although it 
+could have up to four. The one key at the root separates those keys reachable 
+via the first pointer from those reachable via the second. That is, keys up to
+12 could be found in the first subtree of the root, and keys 13 and up are in the 
+second subtree.
+14.2. B-TREES 637
+If we look at the first child of the root, with key 7, we again find two pointers, 
+one to keys less than 7 and the other to keys 7 and above. Note that the second 
+pointer in this node gets us only to keys 7 and 11, not to all keys > 7, such as 
+13.
+Finally, the second child of the root has all four pointer slots in use. The 
+first gets us to some of the keys less than 23, namely 13, 17, and 19. The second 
+pointer gets us to all keys K such that 23 < K <31; the third pointer lets us 
+reach all keys K such that 31 < K < 43, and the fourth pointer gets us to some 
+of the keys > 43 (in this case, to all of them). □
+14.2.2 Applications of B-trees
+The B-tree is a powerful tool for building indexes. The sequence of pointers at 
+the leaves of a B-tree can play the role of any of the pointer sequences coming 
+out of an index file that we learned about in Section 14.1. Here are some 
+examples:
+1. The search key of the B-tree is the primary key for the data file, and the 
+index is dense. That is, there is one key-pointer pair in a leaf for every 
+record of the data file. The data file may or may not be sorted by primary 
+key.
+2. The data file is sorted by its primary key, and the B-tree is a sparse index 
+with one key-pointer pair at a leaf for each block of the data file.
+3. The data file is sorted by an attribute that is not a key, and this attribute 
+is the search key for the B-tree. For each key value K that appears in the 
+data file there is one key-pointer pair at a leaf. That pointer goes to the 
+first of the records that have K as their sort-key value.
+There are additional applications of B-tree variants that allow multiple occurrences of the search key3 at the leaves. Figure 14.14 suggests what such a 
+B-tree might look like.
+If we do allow duplicate occurrences of a search key, then we need to change 
+slightly the definition of what the keys at interior nodes mean, which we discussed in Section 14.2.1. Now, suppose there are keys K \ ,K i ,... ,K n at an 
+interior node. Then Ki will be the smallest new key that appears in the part of 
+the subtree accessible from the (i + l)st pointer. By “new,” we mean that there 
+are no occurrences of Ki in the portion of the tree to the left of the (i + l)st 
+subtree, but at least one occurrence of Ki in that subtree. Note that in some 
+situations, there will be no such key, in which case Ki can be taken to be null. 
+Its associated pointer is still necessary, as it points to a significant portion of 
+the tree that happens to have only one key value within it.
+3 Remember that a “search key” is not necessarily a “key” in the sense of being unique.
+638 CHAPTER 14. INDEX STRUCTURES
+17 _
+/rk
+- 37 43
+2 3 5 7 13 13 17 23 23 23 23 37 41 43 47
+Figure 14.14: A B-tree with duplicate keys
+E xam ple 14.13: Figure 14.14 shows a B-tree similar to Fig. 14.13, but with 
+duplicate values. In particular, key 11 has been replaced by 13, and keys 19, 
+29, and 31 have all been replaced by 23. As a result, the key at the root is 17, 
+not 13. The reason is that, although 13 is the lowest key in the second subtree 
+of the root, it is not a new key for that subtree, since it also appears in the first 
+subtree.
+We also had to make some changes to the second child of the root. The 
+second key is changed to 37, since that is the first new key of the third child 
+(fifth leaf from the left). Most interestingly, the first key is now null. The reason 
+is that the second child (fourth leaf) has no new keys at all. Put another way, 
+if we were searching for any key and reached the second child of the root, we 
+would never want to start at its second child. If we are searching for 23 or 
+anything lower, we want to start at its first child, where we will either find 
+what we are looking for (if it is 17), or find the first of what we are looking for 
+(if it is 23). Note that:
+• We would not reach the second child of the root searching for 13; we would 
+be directed at the root to its first child instead.
+• If we are looking for any key between 24 and 36, we are directed to the 
+third leaf, but when we don’t find even one occurrence of what we are 
+looking for, we know not to search further right. For example, if there 
+were a key 24 among the leaves, it would either be on the 4th leaf, in which 
+case the null key in the second child of the root would be 24 instead, or 
+it would be in the 5th leaf, in which case the key 37 at the second child 
+of the root would be 24.
+□
+14.2. B-TREES 639
+14.2.3 Lookup in B-Trees
+We now revert to our original assumption that there are no duplicate keys at 
+the leaves. We also suppose that the B-tree is a dense index, so every search-key 
+value that appears in the data file will also appear at a leaf. These assumptions 
+make the discussion of B-tree operations simpler, but is not essential for these 
+operations. In particular, modifications for sparse indexes are similar to the 
+changes we introduced in Section 14.1.3 for indexes on sequential files.
+Suppose we have a B-tree index and we want to find a record with searchkey value K . We search for K recursively, starting at the root and ending at a 
+leaf. The search procedure is:
+BASIS: If we are at a leaf, look among the keys there. If the ith key is K , then 
+the ith pointer will take us to the desired record.
+I N DUCTION: If we are at an interior node with keys K i,K 2 , .. . ,K n, follow 
+the rules given in Section 14.2.1 to decide which of the children of this node 
+should next be examined. That is, there is only one child that could lead to a 
+leaf with key K . If K < K \ , then it is the first child, if K \ < K < K 2 , it is the 
+second child, and so on. Recursively apply the search procedure at this child.
+E xam ple 14.14: Suppose we have the B-tree of Fig. 14.13, and we want to 
+find a record with search key 40. We start at the root, where there is one 
+key, 13. Since 13 < 40, we follow the second pointer, which leads us to the 
+second-level node with keys 23, 31, and 43.
+At that node, we find 31 < 40 < 43, so we follow the third pointer. We are 
+thus led to the leaf with keys 31, 37, and 41. If there had been a record in the 
+data file with key 40, we would have found key 40 at this leaf. Since we do not 
+find 40, we conclude that there is no record with key 40 in the underlying data.
+Note that had we been looking for a record with key 37, we would have 
+taken exactly the same decisions, but when we got to the leaf we would find 
+key 37. Since it is the second key in the leaf, we follow the second pointer, 
+which will lead us to the data record with key 37. □
+14.2.4 Range Queries
+B-trees are useful not only for queries in which a single value of the search key 
+is sought, but for queries in which a range of values are asked for. Typically, 
+range queries have a term in the WHERE-clause that compares the search key 
+with a value or values, using one of the comparison operators other than = or 
+<>. Examples of range queries using a search-key attribute k are:
+SELECT * FROM R SELECT * FROM R
+WHERE R.k > 40; WHERE R.k >= 10 AND R.k <= 25;
+If we want to find all keys in the range [a, 6] at the leaves of a B-tree, we do 
+a lookup to find the key a. Whether or not it exists, we are led to a leaf where
+640 CHAPTER 14. INDEX STRUCTURES
+a could be, and we search the leaf for keys that are a or greater. Each such 
+key we find has an associated pointer to one of the records whose key is in the 
+desired range. As long as we do not find a key greater than b in the current 
+block, we follow the pointer to the next leaf and repeat our search for keys in 
+the range [a, 6],
+The above search algorithm also works if b is infinite; i.e., there is only a 
+lower bound and no upper bound. In that case, we search all the leaves from 
+the one that would hold key a to the end of the chain of leaves. If a is — oo 
+(that is, there is an upper bound on the range but no lower bound), then the 
+search for “minus infinity” as a search key will always take us to the first leaf. 
+The search then proceeds as above, stopping only when we pass the key b.
+E xam ple 14.15: Suppose we have the B-tree of Fig. 14.13, and we Eure given 
+the range (10,25) to search for. We look for key 10, which leads us to the second 
+leaf. The first key is less than 10, but the second, 11, is at least 10. We follow 
+its associated pointer to get the record with key 11.
+Since there are no more keys in the second leaf, we follow the chain to the 
+third leaf, where we find keys 13, 17, and 19. All are less than or equal to 25, 
+so we follow their associated pointers and retrieve the records with these keys. 
+Finally, we move to the fourth leaf, where we find key 23. But the next key 
+of that leaf, 29, exceeds 25, so we are done with our search. Thus, we have 
+retrieved the five records with keys 11 through 23. □
+14.2.5 Insertion Into B-Trees
+We see some of the advantages of B-trees over simpler multilevel indexes when 
+we consider how to insert a new key into a B-tree. The corresponding record 
+will be inserted into the file being indexed by the B-tree, using any of the 
+methods discussed in Section 14.1; here we consider how the B-tree changes. 
+The insertion is, in principle, recursive:
+• We try to find a place for the new key in the appropriate leaf, and we put 
+it there if there is room.
+• If there is no room in the proper leaf, we split the leaf into two and divide 
+the keys between the two new nodes, so each is half full or just over half 
+full.
+• The splitting of nodes at one level appears to the level above as if a new 
+key-pointer pair needs to be inserted at that higher level. We may thus 
+recursively apply this strategy to insert at the next level: if there is room, 
+insert it; if not, split the parent node and continue up the tree.
+• As an exception, if we try to insert into the root, and there is no room, 
+then we split the root into two nodes and create a new root at the next 
+higher level; the new root has the two nodes resulting from the split as 
+its children. Recall that no matter how large n (the number of slots for
+14.2. B-TREES 641
+keys at a node) is, it is always permissible for the root to have only one 
+key and two children.
+When we split a node and insert it into its parent, we need to be careful how 
+the keys are managed. First, suppose N is a, leaf whose capacity is n keys. Also 
+suppose we are trying to insert an (n + l)st key and its associated pointer. We 
+create a new node M , which will be the sibling of N , immediately to its right. 
+The first |"(n + 1)/2] key-pointer pairs, in sorted order of the keys, remain with 
+N , while the other key-pointer pairs move to M . Note that both nodes N and 
+M are left with a sufficient number of key-pointer pairs — at least [(n + 1)/2J 
+pairs.
+Now, suppose N is an interior node whose capacity is n keys and n + 1 
+pointers, and N has just been assigned n + 2 pointers because of a node splitting 
+below. We do the following:
+1. Create a new node M , which will be the sibling of N , immediately to its 
+right.
+2. Leave at N the first |~(n + 2)/2] pointers, in sorted order, and move to 
+M the remaining [(n + 2)/2J pointers.
+3. The first fri/2"| keys stay with N , while the last \n/2\ keys move to 
+M . Note that there is always one key in the middle left over; it goes with 
+neither N nor M . The leftover key K indicates the smallest key reachable 
+via the first of M ’s children. Although this key doesn’t appear in N or 
+M , it is associated with M , in the sense that it represents the smallest 
+key reachable via M . Therefore K will be inserted into the parent of N
+and M to divide searches between those two nodes.
+E xam ple 14.16: Let us insert key 40 into the B-tree of Fig. 14.13. We find 
+the proper leaf for the insertion by the lookup procedure of Section 14.2.3. As 
+found in Example 14.14, the insertion goes into the fifth leaf. Since this leaf 
+now has four key-pointer pairs — 31, 37, 40, and 41 — we need to split the 
+leaf. Our first step is to create a new node and move the highest two keys, 40 
+and 41, along with their pointers, to that node. Figure 14.15 shows this split.
+Notice that although we now show the nodes on four ranks to save space, 
+there are still only three levels to the tree. The seven leaves are linked by their 
+last pointers, which still form a chain from left to right.
+We must now insert a pointer to the new leaf (the one with keys 40 and 
+41) into the node above it (the node with keys 23, 31, and 43). We must also 
+associate with this pointer the key 40, which is the least key reachable through 
+the new leaf. Unfortunately, the parent of the split node is already full; it has 
+no room for another key or pointer. Thus, it too must be split.
+We start with pointers to the last five leaves and the list of keys representing the least keys of the last four of these leaves. That is, we have pointers 
+Pi, P2 , P3 , Pi, P5 to the leaves whose least keys are 13, 23, 31, 40, and 43, and
+642 CHAPTER 14. INDEX STRUCTURES
+Figure 14.15: Beginning the insertion of key 40
+we have the key sequence 23, 31, 40, 43 to separate these pointers. The first 
+three pointers and first two keys remain with the split interior node, while the 
+last two pointers and last key go to the new node. The remaining key, 40, 
+represents the least key accessible via the new node.
+Figure 14.16 shows the completion of the insert of key 40. The root now 
+has three children; the last two are the split interior node. Notice that the key 
+40, which marks the lowest of the keys reachable via the second of the split 
+nodes, has been installed in the root to separate the keys of the root’s second 
+and third children. □
+14.2.6 Deletion From B-Trees
+If we are to delete a record with a given key K , we must first locate that record 
+and its key-pointer pair in a leaf of the B-tree. This part of the deletion process 
+is essentially a lookup, as in Section 14.2.3. We then delete the record itself 
+from the data file, and we delete the key-pointer pair from the B-tree.
+If the B-tree node from which a deletion occurred still has at least the 
+minimum number of keys and pointers, then there is nothing more to be done.4 
+However, it is possible that the node was right at the minimum occupancy 
+before the deletion, so after deletion the constraint on the number of keys is
+4If th e d a ta record w ith th e least key a t a leaf is deleted, th en we have th e option of raising 
+th e ap p ro p riate key a t one of th e ancestors of th a t leaf, b u t th ere is no requirem ent th a t we 
+do so; all searches will still go to th e ap p ro p riate leaf.
+14.2. B-TREES 643
+violated. We then need to do one of two things for a node N whose contents 
+are subminimum; one case requires a recursive deletion up the tree:
+1. If one of the adjacent siblings of node N has more than the minimum 
+number of keys and pointers, then one key-pointer pair can be moved to 
+N , keeping the order of keys intact. Possibly, the keys at the parent of N
+must be adjusted to reflect the new situation. For instance, if the right 
+sibling of N , say node M , provides an extra key and pointer, then it must 
+be the smallest key that is moved from M to N . At the parent of M and 
+TV, there is a key that represents the smallest key accessible via M ; that 
+key must be increased to reflect the new M.
+2. The hard case is when neither adjacent sibling can be used to provide 
+an extra key for N . However, in that case, we have two adjacent nodes, 
+N and a sibling M ; the latter has the minimum number of keys and the 
+former has fewer than the minimum. Therefore, together they have no 
+more keys and pointers than are allowed in a single node. We merge these 
+two nodes, effectively deleting one of them. We need to adjust the keys at 
+the parent, and then delete a key and pointer at the parent. If the parent 
+is still full enough, then we are done. If not, then we recursively apply 
+the deletion algorithm at the parent.
+E xam ple 14.17: Let us begin with the original B-tree of Fig. 14.13, before the 
+insertion of key 40. Suppose we delete key 7. This key is found in the second 
+leaf. We delete it, its associated pointer, and the record that pointer points to.
+644 CHAPTER 14. INDEX STRUCTURES
+The second leaf now has only one key, and we need at least two in every 
+leaf. But we are saved by the sibling to the left, the first leaf, because that 
+leaf has an extra key-pointer pair. We may therefore move the highest key, 5, 
+and its associated pointer to the second leaf. The resulting B-tree is shown in 
+Fig. 14.17. Notice that because the lowest key in the second leaf is now 5, the 
+key in the parent of the first two leaves has been changed from 7 to 5.
+5 11 13 17 19 23 29 31 37 41
+1
+43 47
+Figure 14.17: Deletion of key 7
+Next, suppose we delete key 11. This deletion has the same effect on the 
+second leaf; it again reduces the number of its keys below the minimum. This 
+time, however, we cannot take a key from the first leaf, because the latter is 
+down to the minimum number of keys. Additionally, there is no sibling to the 
+right from which to take a key.5 Thus, we need to merge the second leaf with 
+a sibling, namely the first leaf.
+The three remaining key-pointer pairs from the first two leaves fit in one 
+leaf, so we move 5 to the first leaf and delete the second leaf. The pointers 
+and keys in the parent are adjusted to reflect the new situation at its children; 
+specifically, the two pointers are replaced by one (to the remaining leaf) and 
+the key 5 is no longer relevant and is deleted. The situation is now as shown in 
+Fig. 14.18.
+The deletion of a leaf has adversely affected the parent, which is the left 
+child of the root. That node, as we see in Fig. 14.18, now has no keys and only 
+one pointer. Thus, we try to obtain an extra key and pointer from an adjacent 
+sibling. This time we have the easy case, since the other child of the root can 
+afford to give up its smallest key and a pointer.
+The change is shown in Fig. 14.19. The pointer to the leaf with keys 13, 17,
+BN otice th a t th e leaf to th e rig h t, w ith keys 13, 17, an d 19, is n o t a sibling, because it has 
+a different p aren t. W e could take a key from th a t node anyway, b u t th e n th e algorithm for 
+adju stin g keys th ro u g h o u t th e tree becom es m ore com plex. W e leave th is enhancem ent as an 
+exercise.
+14.2. B-TREES 645
+13
+V—
+23 31 43
+\ N
+13 17 19 23 29 31 37 41 43 47
+Figure 14.18: Beginning the deletion of key 11
+and 19 has been moved from the second child of the root to the first child. We 
+have also changed some keys at the interior nodes. The key 13, which used to 
+reside at the root and represented the smallest key accessible via the pointer 
+that was transferred, is now needed at the first child of the root. On the other 
+hand, the key 23, which used to separate the first and second children of the 
+second child of the root now represents the smallest key accessible from the 
+second child of the root. It therefore is placed at the root itself. □
+14.2.7 Efficiency of B-Trees
+B-trees allow lookup, insertion, and deletion of records using very few disk I/O ’s 
+per file operation. First, we should observe that if n, the number of keys per 
+block, is reasonably large, then splitting and merging of blocks will be rare 
+events. Further, when such an operation is needed, it almost always is limited 
+to the leaves, so only two leaves and their parent are affected. Thus, we can 
+essentially neglect the disk-I/O cost of B-tree reorganizations.
+However, every search for the record(s) with a given search key requires us 
+to go from the root down to a leaf, to find a pointer to the record. Since we 
+are only reading B-tree blocks, the number of disk I/O ’s will be the number 
+of levels the B-tree has, plus the one (for lookup) or two (for insert or delete) 
+disk I/O ’s needed for manipulation of the record itself. We must thus ask: 
+how many levels does a B-tree have? For the typical sizes of keys, pointers, 
+and blocks, three levels are sufficient for all but the largest databases. Thus, 
+we shall generally take 3 as the number of levels of a B-tree. The following 
+example illustrates why.
+E xam ple 14.18: Recall our analysis in Example 14.10, where we determined 
+that 340 key-pointer pairs could fit in one block for our example data. Suppose
+646 CHAPTER 14. INDEX STRUCTURES

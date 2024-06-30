@@ -1,0 +1,545 @@
+te that since 
+B(U) = 10,000, we can perform a two-pass hash-join using 100 buckets, 
+regardless of how large k is. Technically, U should appear as the left 
+argument of its join in Fig. 16.37 if we decide to make U the build relation 
+for the hash join.
+The number of disk I/O ’s for this plan is:
+a) 45,000 for the two-pass join of R and S.
+b) k to store R tx S on disk.
+c) 30,000 -I- 3k for the two-pass hash-join of U with R tx 5.
+The total cost is thus 75,000 + 4k, which is less than the cost of going to a 
+three-pass join at the final step. The three complete plans are summarized in 
+the table of Fig. 16.38. □
+834 CHAPTER 16. THE QUERY COMPILER
+Range 
+of k
+Pipeline or 
+Materialize
+Algorithm for 
+final join
+Total Disk 
+I/O ’s
+k < 49 Pipeline one-pass 55,000
+50 < k < 5000 Pipeline 50-bucket,
+two-pass
+75,000 + 2k
+5000 < k Materialize 100-bucket,
+two-pass
+75,000 + 4k
+Figure 16.38: Costs of physical plans as a function of the size of R m S
+16.7.6 Notation for Physical Query Plans
+We have seen many examples of the operators that can be used to form a physical query plan. In general, each operator of the logical plan becomes one or more 
+operators of the physical plan, and leaves (stored relations) of the logical plan 
+become, in the physical plan, one of the scan operators applied to that relation. 
+In addition, materialization would be indicated by a S tore operator applied to 
+the intermediate result that is to be materialized, followed by a suitable scan operator (usually TableScan, since there is no index on the intermediate relation 
+unless one is constructed explicitly) when the materialized result is accessed by 
+its consumer. However, for simplicity, in our physical-query-plan trees we shall 
+indicate that a certain intermediate relation is materialized by a double line 
+crossing the edge between that relation and its consumer. All other edges are 
+assumed to represent pipelining between the supplier and consumer of tuples.
+We shall now catalog the various operators that are typically found in physical query plans. Unlike the relational algebra, whose notation is fairly standard, 
+each DBMS will use its own internal notation for physical query plans.
+O perators for Leaves
+Each relation R that is a leaf operand of the logical-query-plan tree will be 
+replaced by a scan operator. The options are:
+1. TableScan (R): All blocks holding tuples of R are read in arbitrary order.
+2. SortScan(R,L): Tuples of R are read in order, sorted according to the 
+attribute(s) on list L.
+3. IndexScan(R,C): Here, C is a condition of the form .40c, where A is an 
+attribute of R, 0 is a comparison such as = or <, and c is a constant. Tuples of R are accessed through an index on attribute A. If the comparison 
+6 is not then the index must be one, such as a B-tree, that supports 
+range queries.
+4. IndexScan(R, A): Here A is an attribute of R. The entire relation R is 
+retrieved via an index on R.A. This operator behaves like TableScan,
+16.7. COMPLETING THE PHYSICAL-QUERY-PLAN 835
+but may be more efficient if R is not clustered.
+P h ysical O perators for S election
+A logical operator crc(R) is often combined, or partially combined, with the 
+access method for relation R, when R is a stored relation. Other selections, 
+where the argument is not a stored relation or an appropriate index is not 
+available, will be replaced by the corresponding physical operator we have called 
+Filter. Recall the strategy for choosing a selection implementation, which we 
+discussed in Section 16.7.1. The notation we shall use for the various selection 
+implementations are:
+1. We may simply replace ac(R ) by the operator F ilte r(C ). This choice 
+makes sense if there is no index on R, or no index on an attribute that 
+condition C mentions. If R, the argument of the selection, is actually an 
+intermediate relation being pipelined to the selection, then no other operator besides F il t e r is needed. If R is a stored or materialized relation, 
+then we must use an operator, TableScan or SortScan(R,L), to access 
+R. We prefer sort-scan if the result of ac(R ) will later be passed to an 
+operator that requires its argument sorted.
+2. If condition C can be expressed as AOc AND D for some other condition 
+D, and there is an index on R.A, then we may:
+(a) Use the operator IndexScan(R, kdc) to access R, and
+(b) Use F ilte r(D ) in place of the selection ac(R)-
+P h ysical Sort O perators
+Sorting of a relation can occur at any point in the physical query plan. We have 
+already introduced the SortScan(R,L) operator, which reads a stored relation 
+R and produces it sorted according to the list of attributes L. When we apply a 
+sort-based algorithm for operations such as join or grouping, there is an initial 
+phase in which we sort the argument according to some list of attributes. It is 
+common to use an explicit physical operator Sort(L) to perform this sort on 
+an operand relation that is not stored. This operator can also be used at the 
+top of the physical-query-plan tree if the result needs to be sorted because of 
+an ORDER BY clause in the original query, thus playing the same role as the r 
+operator of Section 5.2.6.
+O ther R elational-A lgebra O perations
+All other operations are replaced by a suitable physical operator. These operators can be given designations that indicate:
+1. The operation being performed, e.g., join or grouping.
+836 CHAPTER 16. THE QUERY COMPILER
+2. Necessary parameters, e.g., the condition in a theta-join or the list of 
+elements in a grouping.
+3. A general strategy for the algorithm: sort-based, hash-based, or indexbased, e.g.
+4. A decision about the number of passes to be used: one-pass, two-pass, or 
+multipass (recursive, using as many passes as necessary for the data at 
+hand). Alternatively, this choice may be left until run-time.
+5. An anticipated number of buffers the operation will require.
+E xam ple 16.37: Figure 16.39 shows the physical plan developed in Example 16.36 for the case k > 5000. In this plan, we access each of the three 
+relations by a table-scan. We use a two-pass hash-join for the first join, materialize it, and use a two-pass hash-join for the second join. By implication of 
+the double-line symbol for materialization, the left argument of the top join is 
+also obtained by a table-scan, and the result of the first join is stored using the 
+S tore operator.
+In contrast, if k < 49, then the physical plan developed in Example 16.36 is 
+that shown in Fig. 16.40. Notice that the second join uses a different number 
+of passes, a different number of buffers, and a left argument that is pipelined, 
+not materialized. □
+E xam ple 16.38: Consider the selection operation in Example 16.35, where we 
+decided that the best of options was to use the index on y to find those tuples 
+with y — 2, then check these tuples for the other conditions x — 1 and z < 5.
+Figure 16.41 shows the physical query plan. The leaf indicates that R will be 
+accessed through its index on y, retrieving only those tuples with y = 2. The 
+filter operator says that we complete the selection by further selecting those of 
+the retrieved tuples that have both x = 1 and z <5. □
+two-pass
+hash-join
+101 buffers
+hash-join
+101 buffers
+TableScanfftl TableScanfS 1
+Figure 16.39: A physical plan from Example 16.36
+16.7. COMPLETING THE PHYSICAL-QUERY-PLAN 837
+one-pass
+hash-join
+50 buffers
+two-pass
+hash-join
+101 buffers
+TableScan(t/)
+TableScanf/J ■)
+Figure 16.40: Another physical plan for the case where R x S is expected to 
+be very small
+Filter(x=l AND z<5)
+IndexScan(R, y=2)
+Figure 16.41: Annotating a selection to use the most appropriate index
+16.7.7 Ordering of Physical Operations
+Our final topic regarding physical query plans is the m atter of order of operations. The physical query plan is generally represented as a tree, and trees 
+imply something about order of operations, since data must flow up the tree. 
+However, since bushy trees may have interior nodes that axe neither ancestors 
+nor descendants of one another, the order of evaluation of interior nodes may 
+not always be clear. Moreover, since iterators can be used to implement operations in a pipelined manner, it is possible that the times of execution for various 
+nodes overlap, and the notion of “ordering” nodes makes no sense.
+If materialization is implemented in the obvious store-and-later-retrieve way, 
+and pipelining is implemented by iterators, then we may establish a fixed sequence of events whereby each operation of a physical query plan is executed. 
+The following rules summarize the ordering of events implicit in a physicalquery-plan tree:
+1. Break the tree into subtrees at each edge that represents materialization. 
+The subtrees will be executed one-at-a-time.
+2. Order the execution of the subtrees in a bottom-up, left-to-right manner. 
+To be precise, perform a preorder traversal of the entire tree. Order 
+the subtrees in the order in which the preorder traversal exits from the 
+subtrees.
+838 CHAPTER 16. THE QUERY COMPILER
+3. Execute all nodes of each subtree using a network of iterators. Thus, all 
+the nodes in one subtree are executed simultaneously, with GetNext calls 
+among their operators determining the exact order of events.
+Following this strategy, the query optimizer can now generate executable code, 
+perhaps a sequence of function calls, for the query.
+16.7.8 Exercises for Section 16.7
+E xercise 16.7.1: Consider a relation R(a,b,c,d) that has a clustering index 
+on a and nonclustering indexes on each of the other attributes. The relevant 
+parameters are: B(R) = 1000, T(R) - 5000, V (R ,a) = 20, V(R,b) = 1000, 
+V(R,c) = 5000, and V(R ,d) = 500. Give the best query plan (index-scan 
+or table-scan followed by a filter step) and the disk-I/O cost for each of the 
+following selections:
+a) Oa=l AND 6=2 AND d=s{R)-
+b ) <Ta=l AND 6=2 AND c > 3 (R )-
+c) cra= l AND 6<2 AND c>3(R)-
+! Exercise 16.7.2: In terms of B(R), T(R), V (R ,x), and V (R ,y), express the 
+following conditions about the cost of implementing a selection on R:
+a) It is better to use index-scan with a nonclustering index on x and a term 
+that equates a; to a constant than a nonclustering index on y and a term 
+that equates y to a constant.
+b) It is better to use index-scan with a nonclustering index on x and a term 
+that equates a; to a constant than a clustering index on y and a term that 
+equates y to a constant.
+c) It is better to use index-scan with a nonclustering index on x and a term 
+that equates x to a constant than a clustering index on y and a term of 
+the form y > C for some constant C.
+E xercise 16.7.3: How would the conclusions about when to pipeline in Example 16.36 change if the size of relation R were not 5000 blocks, but: (a) 2000 
+blocks ! (b) 10,000 blocks ! (c) 100 blocks?
+! Exercise 16.7.4: Suppose we want to compute (R(a,b) tx S(a,c)) tx T(a,d)
+in the order indicated. We have M — 101 main-memory buffers, and B(R) = 
+B (S) = 2000. Because the join attribute a is the same for both joins, we decide 
+to implement the first join R tx 5 by a two-pass sort-join, and we shall use 
+the appropriate number of passes for the second join, first dividing T into some 
+number of sublists sorted on a, and merging them with the sorted and pipelined 
+stream of tuples from the join R tx S. For what values of B (T) should we choose 
+for the join of T with R ix S:
+16.8. SUM M ARY OF CHAPTER 16 839
+a) A one-pass join; i.e., we read T into memory, and compare its tuples with 
+the tuples of R cx 5 as they are generated.
+b) A two-pass join; i.e., we create sorted sublists for T and keep one buffer 
+in memory for each sorted sublist, while we generate tuples of R tx S.
+16.8 Summary of Chapter 16
+♦ Compilation of Queries: Compilation turns a query into a physical query 
+plan, which is a sequence of operations that can be implemented by the 
+query-execution engine. The principal steps of query compilation are 
+parsing, semantic checking, selection of the preferred logical query plan 
+(algebraic expression), and generation from that of the best physical plan.
+♦ The Parser: The first step in processing a SQL query is to parse it, as 
+one would for code in any programming language. The result of parsing 
+is a parse tree with nodes corresponding to SQL constructs.
+♦ View Expansion: Queries that refer to virtual views must have these 
+references in the parse tree replaced by the tree for the expression that 
+defines the view. This expansion often introduces several opportunities 
+to optimize the complete query.
+♦ Semantic Checking: A preprocessor examines the parse tree, checks that 
+the attributes, relation names, and types make sense, and resolves attribute references.
+♦ Conversion to a Logical Query Plan: The query processor must convert 
+the semantically checked parse tree to an algebraic expression. Much 
+of the conversion to relational algebra is straightforward, but subqueries 
+present a problem. One approach is to introduce a two-argument selection 
+that puts the subquery in the condition of the selection, and then apply 
+appropriate transformations for the common special cases.
+♦ Algebraic Transformations: There are many ways that a logical query plan 
+can be transformed to a better plan by using algebraic transformations. 
+Section 16.2 enumerates the principal ones.
+♦ Choosing a Logical Query Plan: The query processor must select that 
+query plan that is most likely to lead to an efficient physical plan. In 
+addition to applying algebraic transformations, it is useful to group associative and commutative operators, especially joins, so the physical query 
+plan can choose the best order and grouping for these operations.
+♦ Estimating Sizes of Relations: When selecting the best logical plan, or 
+when ordering joins or other associative-commutative operations, we use 
+the estimated size of intermediate relations as a surrogate for the true
+840 CHAPTER 16. THE QUERY COMPILER
+running time. Knowing, or estimating, both the size (number of tuples) 
+of relations and the number of distinct values for each attribute of each 
+relation helps us get good estimates of the sizes of intermediate relations.
+♦ Histograms: Some systems keep histograms of the values for a given 
+attribute. This information can be used to obtain better estimates of 
+intermediate-relation sizes than the simple methods stressed here.
+♦ Cost-Based Optimization: When selecting the best physical plan, we need 
+to estimate the cost of each possible plan. Various strategies axe used to 
+generate all or some of the possible physical plans that implement a given 
+logical plan.
+♦ Plan-Enumeration Strategies: The common approaches to searching the 
+space of physical plans for the best include dynamic programming (tabularizing the best plan for each subexpression of the given logical plan), 
+Selinger-style dynamic programming (which includes the sort-order of results as part of the table, giving best plans for each sort-order and for an 
+unsorted result), greedy approaches (making a series of locally optimal 
+decisions, given the choices for the physical plan that have been made so 
+far), and branch-and-bound (enumerating only plans that are not immediately known to be worse than the best plan found so far).
+♦ Left-Deep Join Trees: When picking a grouping and order for the join 
+of several relations, it is common to restrict the search to left-deep trees, 
+which axe binaxy trees with a single spine down the left edge, with only 
+leaves as right children. This form of join expression tends to yield efficient 
+plans and also limits significantly the number of physical plans that need 
+to be considered.
+♦ Physical Plans for Selection: If possible, a selection should be broken into 
+an index-scan of the relation to which the selection is applied (typically 
+using a condition in which the indexed attribute is equated to a constant), 
+followed by a filter operation. The filter examines the tuples retrieved by 
+the index-scan and passes through only those that meet the portions of 
+the selection condition other than that on which the index scan is based.
+♦ Pipelining Versus Materialization: Ideally, the result of each physical operator is consumed by another operator, with the result being passed between the two in main memory (“pipelining”), perhaps using an iterator to 
+control the flow of data from one to the other. However, sometimes there 
+is an advantage to storing (“materializing”) the result of one operator 
+to save space in main memory for other operators. Thus, the physicalquery-plan generator should consider both pipelining and materialization 
+of intermediates.
+16.9. REFERENCES FOR CHAPTER 16 841
+16.9 References for Chapter 16
+The surveys mentioned in the bibliographic notes to Chapter 15 also contain 
+material relevant to query compilation. In addition, we recommend the survey
+[1], which contains material on the query optimizers of commercial systems.
+Three of the earliest studies of query optimization are [4], [5], and [3]. Paper [6], another early study, incorporates the idea of pushing selections down 
+the tree with the greedy algorithm for join-order choice. [2] is the source for 
+“Selinger-style optimization” as well as describing the System R optimizer, 
+which was one of the most ambitious attempts at query optimization of its 
+day.
+1. G. Graefe (ed.), Data Engineering 16:4 (1993), special issue on query 
+processing in commercial database management systems, IEEE.
+2. P. Griffiths-Selinger, M. M. Astrahan, D. D. Chamberlin, R. A. Lorie, and 
+T. G. Price, “Access path selection in a relational database system,” Proc.
+ACM SIGMOD Intl. Conf. on Management of Data (1979), pp. 23-34.
+3. P. A. V. Hall, “Optimization of a single relational expression in a relational database system,” IBM J. Research and Development 20:3 (1976), 
+pp. 244-257.
+4. F. P. Palermo, “A database search problem,” in: J. T. Tou (ed.) Information Systems COINS IV, Plenum, New York, 1974.
+5. J. M. Smith and P. Y. Chang, “Optimizing the performance of a relational 
+algebra database interface,” Comm. ACM 18:10 (1975), pp. 568-579.
+6. E. Wong and K. Youssefi, “Decomposition — a strategy for query processing,” ACM Trans, on Database Systems 1:3 (1976), pp. 223-241.
+
+Chapter 17
+Coping W ith System
+Failures
+Starting with this chapter, we focus our attention on those parts of a DBMS 
+that control access to data. There are two major issues to address:
+1. Data must be protected in the face of a system failure. This chapter deals 
+with techniques for supporting the goal of resilience, that is, integrity of 
+the data when the system fails in some way.
+2. Data must not be corrupted simply because several error-free queries or 
+database modifications are being done at once. This matter is addressed 
+in Chapters 18 and 19.
+The principal technique for supporting resilience is a log, which records 
+securely the history of database changes. We shall discuss three different styles 
+of logging, called “undo,” “redo,” and “undo/redo.” We also discuss recovery,
+the process whereby the log is used to reconstruct what has happened to the 
+database when there has been a failure. An important aspect of logging and 
+recovery is avoidance of the situation where the log must be examined into 
+the distant past. Thus, we shall learn about “checkpointing,” which limits the 
+length of log that must be examined during recovery.
+In a final section, we discuss “archiving,” which allows the database to 
+survive not only temporary system failures, but situations where the entire 
+database is lost. Then, we must rely on a recent copy of the database (the 
+archive) plus whatever log information survives, to reconstruct the database as 
+it existed at some point in the recent past.
+17.1 Issues and M odels for Resilient Operation
+We begin our discussion of coping with failures by reviewing the kinds of things 
+that can go wrong, and what a DBMS can and should do about them. We
+843
+844 CHAPTER 17. COPING W ITH SYSTE M FAILURES
+initially focus on “system failures” or “crashes,” the kinds of errors that the 
+logging and recovery methods are designed to fix. We also introduce in Section 17.1.4 the model for buffer management that underlies all discussions of 
+recovery from system errors. The same model is needed in the next chapter as 
+we discuss concurrent access to the database by several transactions.
+17.1.1 Failure Modes
+There are many things that can go wrong as a database is queried and modified. 
+Problems range from the keyboard entry of incorrect data to an explosion in the 
+room where the database is stored on disk. The following items are a catalog 
+of the most important failure modes and what the DBMS can do about them.
+E rroneous D a ta E ntry
+Some data errors are impossible to detect. For example, if a clerk mistypes one 
+digit of your phone number, the data will still look like a phone number that 
+could be yours. On the other hand, if the clerk omits a digit from your phone 
+number, then the data is evidently in error, since it does not have the form of 
+a phone number. The principal technique for addressing data-entry errors is to 
+write constraints and triggers that detect data believed to be erroneous.
+M ed ia Failures
+A local failure of a disk, one that changes only a bit or a few bits, can normally be detected by parity checks associated with the sectors of the disk, as 
+we discussed in Section 13.4.2. Head crashes, where the entire disk becomes 
+unreadable, are generally handled by one or both of the following approaches:
+1. Use one of the RAID schemes discussed in Section 13.4, so the lost disk 
+can be restored.
+2. Maintain an archive, a copy of the database on a medium such as tape 
+or optical disk. The archive is periodically created, either fully or incrementally, and stored at a safe distance from the database itself. We shall 
+discuss archiving in Section 17.5.
+3. Instead of an archive, one could keep redundant copies of the database 
+on-line, distributed among several sites. These copies are kept consistent 
+by mechanisms we shall discuss in Section 20.6.
+C atastrophic Failure
+In this category are a number of situations in which the media holding the 
+database is completely destroyed. Examples include explosions, fires, or vandalism at the site of the database. RAID will not help, since all the data disks 
+and their parity check disks become useless simultaneously. However, the other
+17.1. ISSUES AND MODELS FOR RESILIENT OPERATION 845
+approaches that can be used to protect against media failure — archiving and 
+redundant, distributed copies — will also protect against a catastrophic failure.
+S ystem Failures
+The processes that query and modify the database are called transactions. A 
+transaction, like any program, executes a number of steps in sequence; often, 
+several of these steps will modify the database. Each transaction has a state,
+which represents what has happened so far in the transaction. The state includes the current place in the transaction’s code being executed and the values 
+of any local variables of the transaction that will be needed later on.
+System failures are problems that cause the state of a transaction to be lost. 
+Typical system failures are power loss and software errors. Since main memory is “volatile,” as we discussed in Section 13.1.3, a power failure will cause 
+the contents of main memory to disappear, along with the result of any transaction step that was kept only in main memory, rather than on (nonvolatile) 
+disk. Similarly, a software error may overwrite part of main memory, possibly 
+including values that were part of the state of the program.
+When main memory is lost, the transaction state is lost; that is, we can no 
+longer tell what parts of the transaction, including its database modifications, 
+were made. Running the transaction again may not fix the problem. For 
+example, if the transaction must add 1 to a value in the database, we do not 
+know whether to repeat the addition of 1 or not. The principal remedy for the 
+problems that arise due to a system error is logging of all database changes in 
+a separate, nonvolatile log, coupled with recovery when necessary. However, 
+the mechanisms whereby such logging can be done in a fail-safe manner are 
+surprisingly intricate, as we shall see starting in Section 17.2.
+17.1.2 More About Transactions
+We introduced the idea of transactions from the point of view of the SQL programmer in Section 6.6. Before proceeding to our study of database resilience 
+and recovery from failures, we need to discuss the fundamental notion of a 
+transaction in more detail.
+The transaction is the unit of execution of database operations. For example, 
+if we are issuing ad-hoc commands to a SQL system, then each query or database 
+modification statement (plus any resulting trigger actions) is a transaction. 
+When using an embedded SQL interface, the programmer controls the extent 
+of a transaction, which may include several queries or modifications, as well 
+as operations performed in the host language. In the typical embedded SQL 
+system, transactions begin as soon as operations on the database are executed 
+and end with an explicit COMMIT or ROLLBACK (“abort”) command.
+As we shall discuss in Section 17.1.3, a transaction must execute atomically, 
+that is, all-or-nothing and as if it were executed at an instant in time. Assuring
+846 CHAPTER 17. COPING W ITH SYSTEM FAILURES
+that transactions are executed correctly is the job of a transaction manager, a 
+subsystem that performs several functions, including:
+1. Issuing signals to the log manager (described below) so that necessary 
+information in the form of “log records” can be stored on the log.
+2. Assuring that concurrently executing transactions do not interfere with 
+each other in ways that introduce errors (“scheduling”; see Section 18.1).
+Figure 17.1: The log manager and transaction manager
+The transaction manager and its interactions are suggested by Fig. 17.1. 
+The transaction manager will send messages about actions of transactions to 
+the log manager, to the buffer manager about when it is possible or necessary to 
+copy the buffer back to disk, and to the query processor to execute the queries 
+and other database operations that comprise the transaction.
+The log manager maintains the log. It must deal with the buffer manager, 
+since space for the log initially appears in main-memory buffers, and at certain 
+times these buffers must be copied to disk. The log, as well as the data, occupies 
+space on the disk, as we suggest in Fig. 17.1.
+Finally, we show a recovery manager in Fig. 17.1. When there is a crash, 
+the recovery manager is activated. It examines the log and uses it to repair the 
+data, if necessary. As always, access to the disk is through the buffer manager.
+17.1.3 Correct Execution of Transactions
+Before we can deal with correcting system errors, we need to understand what 
+it means for a transaction to be executed “correctly.” To begin, we assume that 
+the database is composed of “elements.” We shall not specify precisely what 
+an “element” is, except to say it has a value and can be accessed or modified 
+by transactions. Different database systems use different notions of elements, 
+but they are usually chosen from one or more of the following:
+17.1. ISSUES AND MODELS FOR RESILIENT OPERATION 847
+1. Relations.
+2. Disk blocks or pages.
+3. Individual tuples or objects.
+In examples to follow, one can imagine that database elements are tuples, 
+or in many examples, simply integers. However, there are several good reasons 
+in practice to use choice (2) — disk blocks or pages — as the database element. 
+In this way, buffer-contents become single elements, allowing us to avoid some 
+serious problems with logging and transactions that we shall explore periodically 
+as we learn various techniques. Avoiding database elements that are bigger than 
+disk blocks also prevents a situation where part but not all of an element has 
+been placed in nonvolatile storage when a crash occurs.
+A database has a state, which is a value for each of its elements.1 Intuitively, 
+we regard certain states as consistent, and others as inconsistent. Consistent 
+states satisfy all constraints of the database schema, such as key constraints 
+and constraints on values. However, consistent states must also satisfy implicit 
+constraints that are in the mind of the database designer. The implicit constraints may be maintained by triggers that are part of the database schema, 
+but they might also be maintained only by policy statements concerning the 
+database, or warnings associated with the user interface through which updates 
+are made.
+A fundamental assumption about transactions is:
+• The Correctness Principle: If a transaction executes in the absence of any 
+other transactions or system errors, and it starts with the database in a 
+consistent state, then the database is also in a consistent state when the 
+transaction ends.
+There is a converse to the correctness principle that forms the motivation 
+for both the logging techniques discussed in this chapter and the concurrency 
+control mechanisms discussed in Chapter 18. This converse involves two points:
+1. A transaction is atomic-, that is, it must be executed as a whole or not 
+at all. If only part of a transaction executes, then the resulting database 
+state may not be consistent.
+2. Transactions that execute simultaneously are likely to lead to an inconsistent state unless we take steps to control their interactions, as we shall 
+in Chapter 18.
+1 We should n o t confuse th e d atab ase sta te w ith th e sta te of a tran sactio n ; th e la tte r is 
+values for th e tra n sa c tio n ’s local variables, not d atab ase elem ents.
+848 CHAPTER 17. COPING W ITH SYSTE M FAILURES
+Is the Correctness Principle Believable?
+Given that a database transaction could be an ad-hoc modification command issued at a terminal, perhaps by someone who doesn’t understand 
+the implicit constraints in the mind of the database designer, is it plausible 
+to assume all transactions take the database from a consistent state to another consistent state? Explicit constraints are enforced by the database, 
+so any transaction that violates them will be rejected by the system and 
+not change the database at all. As for implicit constraints, one cannot 
+characterize them exactly under any circumstances. Our position, justifying the correctness principle, is that if someone is given authority to 
+modify the database, then they also have the authority to judge what the 
+implicit constraints are.
+17.1.4 The Prim itive Operations of Transactions
+Let us now consider in detail how transactions interact with the database. There 
+are three address spaces that interact in important ways:
+1. The space of disk blocks holding the database elements.
+2. The virtual or main memory address space that is managed by the buffer 
+manager.
+3. The local address space of the transaction.
+For a transaction to read a database element, that element must first be 
+brought to a main-memory buffer or buffers, if it is not already there. Then, 
+the contents of the buffer(s) can be read by the transaction into its own address 
+space. Writing a new value for a database element by a transaction follows the 
+reverse route. The new value is first created by the transaction in its own space. 
+Then, this value is copied to the appropriate buffer(s).
+The buffer may or may not be copied to disk immediately; that decision is 
+the responsibility of the buffer manager in general. As we shall soon see, one of 
+the principal tools for assuring resilience is forcing the buffer manager to write 
+the block in a buffer back to disk at appropriate times. However, in order to 
+reduce the number of disk I/O ’s, database systems can and will allow a change 
+to exist only in volatile main-memory storage, at least for certain periods of 
+time and under the proper set of conditions.
+In order to study the details of logging algorithms and other transactionmanagement algorithms, we need a notation that describes all the operations 
+that move data between address spaces. The primitives we shall use are:
+1. INPUT(X): Copy the disk block containing database element X to a memory buffer.
+17.1. ISSUES AND MODELS FOR RESILIENT OPERATION 849
+Buffers in Query Processing and in Transactions
+If you got used to the analysis of buffer utilization in the chapters on 
+query processing, you may notice a change in viewpoint here. In Chapters 
+15 and 16 we were interested in buffers principally as they were used 
+to compute temporary relations during the evaluation of a query. That 
+is one important use of buffers, but there is never a need to preserve 
+a temporary value, so these buffers do not generally have their values 
+logged. On the other hand, those buffers that hold data retrieved from 
+the database do need to have those values preserved, especially when the 
+transaction updates them.
+2. READ(X,t): Copy the database element X to the transaction’s local variable t. More precisely, if the block containing database element X is not 
+in a memory buffer then first execute INPUT (X). Next, assign the value of 
+X to local variable t.
+3. WRITE(X.t): Copy the value of local variable t to database element X in 
+a memory buffer. More precisely, if the block containing database element 
+X is not in a memory buffer then execute INPUT(X). Next, copy the value 
+of t to X in the buffer.
+4. OUTPUT (X): Copy the block containing X from its buffer to disk.
+The above operations make sense as long as database elements reside within 
+a single disk block, and therefore within a single buffer. If a database element 
+occupies several blocks, we shall imagine that each block-sized portion of the 
+element is an element by itself. The logging mechanism to be used will assure 
+that the transaction cannot complete without the write of X being atomic; i.e., 
+either all blocks of X are written to disk, or none are. Thus, we shall assume 
+for the entire discussion of logging that
+• A database element is no larger than a single block.
+Different DBMS components issue the various commands we just introduced. READ and WRITE are issued by transactions. INPUT and OUTPUT are 
+normally issued by the buffer manager. OUTPUT can also be initiated by the log 
+manager under certain conditions, as we shall see.
+E xam ple 17.1: To see how the above primitive operations relate to what a 
+transaction might do, let us consider a database that has two elements, A and 
+B, with the constraint that they must be equal in all consistent states.2
+Transaction T consists logically of the following two steps:
+2 O ne reasonably m ight ask w hy we should b o th e r to have tw o different elem ents th a t are 
+co nstrained to be equal, ra th e r th a n m aintaining only one elem ent. However, th is sim ple
+850 CHAPTER 17. COPING W ITH SYSTEM FAILURES
+A := A*2;
+B := B*2;
+If T starts in a consistent state (i.e., A = B) and completes its activities without 
+interference from another transaction or system error, then the final state must 
+also be consistent. That is, T doubles two equal elements to get new, equal 
+elements.
+Execution of T involves reading A and B from disk, performing arithmetic 
+in the local address space of T, and writing the new values of A and B to their 
+buffers. The relevant steps of T are thus:
+READ(A,t); t := t*2; WRITE(A.t); READ(B.t); t := t* 2 ; WRITE(B,t);
+In addition, the buffer manager will eventually execute the OUTPUT steps to 
+write these buffers back to disk. Figure 17.2 shows the primitive steps of T, 
+followed by the two OUTPUT commands from the buffer manager. We assume 
+that initially A — B — 8. The values of the memory and disk copies of A and 
+B and the local variable t in the address space of transaction T are indicated 
+for each step.
+Action t Mem A Mem B Disk A Disk B
+READ(A,t) 8 8 8 8
+t := t *2 16 8 8 8
+WRITE(A ,t) 16 16 8 8
+READ(B,t) 8 16 8 8 8
+t := t *2 16 16 8 8 8
+WRITE(B,t) 16 16 16 8 8
+OUTPUT(A) 16 16 16 16 8
+OUTPUT(B) 16 16 16 16 16
+Figure 17.2: Steps of a transaction and its effect on memory and disk
+At the first step, T reads A, which generates an INPUT (A) command for the 
+buffer manager if A’s block is not already in a buffer. The value of A is also 
+copied by the READ command into local variable t of T ’s address space. The 
+second step doubles t; it has no affect on A, either in a buffer or on disk. The 
+third step writes t into A of the buffer; it does not affect A on disk. The next 
+three steps do the same for B, and the last two steps copy A and B to disk.
+Observe that as long as all these steps execute, consistency of the database 
+is preserved. If a system error occurs before OUTPUT (A) is executed, then there 
+is no effect to the database stored on disk; it is as if T never ran, and consistency 
+is preserved. However, if there is a system error after 
